@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:my_school_app/modules/home.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -221,32 +222,99 @@ class _LoginScreenState extends State<LoginScreen>
                             return null;
                           },
                         ),
-
                         const SizedBox(height: 24),
 
                         // Phone number field
                         _buildLabel("School's Phone Number"),
                         const SizedBox(height: 8),
-                        _buildTextField(
+                        IntlPhoneField(
                           controller: _phoneController,
-                          hint: 'e.g. 9876543210',
-                          icon: Icons.phone_rounded,
-                          keyboardType: TextInputType.phone,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(15),
-                          ],
+                          style: GoogleFonts.nunito(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: "Phone Number",
+                            hintStyle: GoogleFonts.nunito(
+                              color: Colors.white30,
+                              fontSize: 15,
+                            ),
+
+                            filled: true,
+                            fillColor: const Color(0xFF151B45),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(
+                                color: Color(0xFF1E2A6E),
+                                width: 1.5,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(
+                                color: Color(0xFF5C6BC0),
+                                width: 2,
+                              ),
+                            ),
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFEF5350),
+                                width: 1.5,
+                              ),
+                            ),
+                            focusedErrorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFEF5350),
+                                width: 2,
+                              ),
+                            ),
+                            errorStyle: GoogleFonts.nunito(
+                              color: const Color(0xFFEF9A9A),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 18,
+                            ),
+                          ),
+                          initialCountryCode: 'IN', // default country
+                          onChanged: (phone) {
+                            print(phone.completeNumber); // includes +91
+                          },
                           validator: (v) {
-                            if (v == null || v.trim().isEmpty) {
-                              return 'Please enter the phone number';
-                            }
-                            if (v.trim().length < 10) {
-                              return 'Enter at least 10 digits';
-                            }
+                            if (v == null || v.number.isEmpty)
+                              return 'Enter phone number';
                             return null;
                           },
                         ),
 
+                        // _buildTextField(
+                        //   controller: _phoneController,
+                        //   hint: 'e.g.9876543210',
+                        //   icon: Icons.phone_rounded,
+                        //   keyboardType: TextInputType.phone,
+                        //   inputFormatters: [
+                        //     FilteringTextInputFormatter.digitsOnly,
+                        //     LengthLimitingTextInputFormatter(15),
+                        //   ],
+                        //   validator: (v) {
+                        //     if (v == null || v.trim().isEmpty) {
+                        //       return 'Please enter the phone number';
+                        //     }
+                        //     if (v.trim().length < 10) {
+                        //       return 'Enter at least 10 digits';
+                        //     }
+                        //     return null;
+                        //   },
+                        // ),
                         const SizedBox(height: 12),
 
                         // Info hint
