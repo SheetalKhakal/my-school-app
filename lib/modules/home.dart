@@ -1,59 +1,463 @@
 import 'package:flutter/material.dart';
-import 'package:my_school_app/modules/school_banner.dart';
-import 'package:phone_state/phone_state.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:my_school_app/modules/login.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:phone_state/phone_state.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import 'call_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final String phoneNumber;
+  final String schoolName;
+
+  const HomeScreen({
+    super.key,
+    required this.phoneNumber,
+    required this.schoolName,
+  });
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  String? savedNumber;
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  bool _monitoringActive = false;
+  bool _overlayPermission = false;
+  String _statusText = 'Requesting permissions…';
+  late AnimationController _pulseCtrl;
+  late Animation<double> _pulseAnim;
 
   @override
   void initState() {
     super.initState();
-    loadNumber();
-    listenCalls();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+    _pulseAnim = Tween<double>(
+      begin: 0.85,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+
+    _initPermissions();
   }
 
-  Future<void> loadNumber() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      savedNumber = prefs.getString("phone");
-    });
-  }
+  Future<void> _initPermissions() async {
+    // Phone state permission
+    final phoneStatus = await Permission.phone.request();
 
-  bool isSameNumber(String a, String b) {
-    String normalize(String num) {
-      return num.replaceAll(RegExp(r'\D'), '') // remove non-digits
-          .replaceAll(RegExp(r'^91'), ''); // remove country code (India)
+    // Overlay permission
+    final canOverlay = await FlutterOverlayWindow.isPermissionGranted();
+    if (!canOverlay) {
+      await FlutterOverlayWindow.requestPermission();
     }
+    final overlayGranted = await FlutterOverlayWindow.isPermissionGranted();
 
-    return normalize(a) == normalize(b);
+    setState(() {
+      _overlayPermission = overlayGranted;
+      _monitoringActive = phoneStatus.isGranted && overlayGranted;
+      _statusText = _monitoringActive
+          ? 'Monitoring active'
+          : 'Some permissions missing';
+    });
+
+    if (_monitoringActive) {
+      _startListening();
+    }
   }
 
-  void listenCalls() {
-    PhoneState.stream.listen((event) {
-      if (event != null && event.status == PhoneStateStatus.CALL_INCOMING) {
-        print("INCOMING CALL DETECTED");
+  void _startListening() {
+    PhoneState.stream.listen((PhoneState event) async {
+      if (event.status == PhoneStateStatus.CALL_INCOMING ||
+          event.status == PhoneStateStatus.CALL_STARTED) {
+        final incoming = event.number ?? '';
+        final normalized = _normalizeNumber(incoming);
+        final saved = _normalizeNumber(widget.phoneNumber);
 
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => SchoolBannerScreen()),
-        );
+        if (normalized.endsWith(saved) || saved.endsWith(normalized)) {
+          await _showSchoolOverlay();
+        }
       }
     });
+  }
+
+  String _normalizeNumber(String number) {
+    return number.replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
+  }
+
+  Future<void> _showSchoolOverlay() async {
+    final isActive = await FlutterOverlayWindow.isActive();
+    if (!isActive) {
+      await FlutterOverlayWindow.showOverlay(
+        enableDrag: false,
+        overlayTitle: widget.schoolName,
+        overlayContent: 'Incoming call from ${widget.schoolName}',
+        flag: OverlayFlag.defaultFlag,
+        visibility: NotificationVisibility.visibilityPublic,
+        positionGravity: PositionGravity.auto,
+        height: WindowSize.fullCover,
+        width: WindowSize.fullCover,
+      );
+
+      // Send school name data to overlay
+      await FlutterOverlayWindow.shareData({'school_name': widget.schoolName});
+    }
+  }
+
+  Future<void> _logout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF151B45),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Reset Settings',
+          style: GoogleFonts.nunito(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        content: Text(
+          'This will clear the saved number and school name. Continue?',
+          style: GoogleFonts.nunito(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.nunito(color: Colors.white54),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              'Reset',
+              style: GoogleFonts.nunito(
+                color: const Color(0xFFEF5350),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('monitored_phone');
+      await prefs.remove('school_name');
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+    }
+  }
+
+  /// Preview the call screen (demo)
+  void _previewCallScreen() {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => CallScreen(schoolName: widget.schoolName),
+        transitionsBuilder: (_, animation, __, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 400),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Home")),
-      body: Center(child: Text("Waiting for incoming call...")),
+      backgroundColor: const Color(0xFF0A0E2A),
+      body: Stack(
+        children: [
+          // Background blobs
+          Positioned(
+            top: -60,
+            right: -80,
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF3949AB).withOpacity(0.35),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -80,
+            left: -50,
+            child: Container(
+              width: 240,
+              height: 240,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF1565C0).withOpacity(0.3),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 24),
+
+                  // Top bar
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'School Call\nAlert',
+                        style: GoogleFonts.nunito(
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                          height: 1.1,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _logout,
+                        icon: const Icon(
+                          Icons.settings_backup_restore_rounded,
+                          color: Colors.white54,
+                        ),
+                        tooltip: 'Reset settings',
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 40),
+
+                  // Status card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF1A237E), Color(0xFF1565C0)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF1A237E).withOpacity(0.5),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        // Pulsing indicator
+                        ScaleTransition(
+                          scale: _pulseAnim,
+                          child: Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _monitoringActive
+                                  ? const Color(0xFF4CAF50)
+                                  : const Color(0xFFEF5350),
+                              boxShadow: [
+                                BoxShadow(
+                                  color:
+                                      (_monitoringActive
+                                              ? const Color(0xFF4CAF50)
+                                              : const Color(0xFFEF5350))
+                                          .withOpacity(0.5),
+                                  blurRadius: 20,
+                                  spreadRadius: 4,
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              _monitoringActive
+                                  ? Icons.shield_rounded
+                                  : Icons.warning_rounded,
+                              color: Colors.white,
+                              size: 32,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _statusText,
+                          style: GoogleFonts.nunito(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _monitoringActive
+                              ? 'Your app is watching for calls'
+                              : 'Grant permissions to enable monitoring',
+                          style: GoogleFonts.nunito(
+                            color: Colors.white60,
+                            fontSize: 13,
+                          ),
+                        ),
+                        if (!_monitoringActive) ...[
+                          const SizedBox(height: 14),
+                          TextButton(
+                            onPressed: _initPermissions,
+                            style: TextButton.styleFrom(
+                              backgroundColor: Colors.white.withOpacity(0.15),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 10,
+                              ),
+                            ),
+                            child: Text(
+                              'Retry Permissions',
+                              style: GoogleFonts.nunito(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // Info cards
+                  _infoCard(
+                    icon: Icons.school_rounded,
+                    label: 'School',
+                    value: widget.schoolName,
+                    color: const Color(0xFF5C6BC0),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _infoCard(
+                    icon: Icons.phone_rounded,
+                    label: 'Monitored Number',
+                    value: widget.phoneNumber,
+                    color: const Color(0xFF1976D2),
+                  ),
+
+                  const Spacer(),
+
+                  // Preview button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 58,
+                    child: ElevatedButton.icon(
+                      onPressed: _previewCallScreen,
+                      icon: const Icon(Icons.preview_rounded, size: 22),
+                      label: Text(
+                        'Preview Call Screen',
+                        style: GoogleFonts.nunito(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF283593),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F1535),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.nunito(
+                  color: Colors.white38,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: GoogleFonts.nunito(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
