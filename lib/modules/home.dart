@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:my_school_app/main.dart';
 import 'package:my_school_app/modules/login.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -23,7 +25,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _monitoringActive = false;
-  bool _overlayPermission = false;
   String _statusText = 'Requesting permissions…';
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseAnim;
@@ -44,22 +45,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _initPermissions() async {
-    // Phone state permission
+    // 📞 Phone permission
     final phoneStatus = await Permission.phone.request();
 
-    // Overlay permission
-    final canOverlay = await FlutterOverlayWindow.isPermissionGranted();
-    if (!canOverlay) {
-      await FlutterOverlayWindow.requestPermission();
-    }
-    final overlayGranted = await FlutterOverlayWindow.isPermissionGranted();
+    // 🔔 Notification permission (IMPORTANT for Android 13+)
+    final notificationStatus = await Permission.notification.request();
 
     setState(() {
-      _overlayPermission = overlayGranted;
-      _monitoringActive = phoneStatus.isGranted && overlayGranted;
+      _monitoringActive = phoneStatus.isGranted && notificationStatus.isGranted;
+
       _statusText = _monitoringActive
           ? 'Monitoring active'
-          : 'Some permissions missing';
+          : 'Grant phone & notification permissions';
     });
 
     if (_monitoringActive) {
@@ -87,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (event.status == PhoneStateStatus.CALL_ENDED) {
         if (normalized.endsWith(saved) || saved.endsWith(normalized)) {
           print("✅ CALL ENDED MATCH → SHOW OVERLAY");
-          await _showSchoolOverlay();
+          await _showCallNotification();
         }
       }
     });
@@ -104,39 +101,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return number;
   }
 
-  Future<void> _showSchoolOverlay() async {
-    final isGranted = await FlutterOverlayWindow.isPermissionGranted();
+  Future<void> _showCallNotification() async {
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          'call_channel',
+          'Call Alerts',
+          channelDescription: 'School Call Alerts',
+          importance: Importance.max,
+          priority: Priority.high,
+          fullScreenIntent: true,
+        );
 
-    if (!isGranted) {
-      await FlutterOverlayWindow.requestPermission();
-      return;
-    }
-
-    final isActive = await FlutterOverlayWindow.isActive();
-
-    // ✅ Always close previous overlay (important fix)
-    if (isActive) {
-      await FlutterOverlayWindow.closeOverlay();
-      await Future.delayed(const Duration(milliseconds: 200));
-    }
-
-    await FlutterOverlayWindow.showOverlay(
-      enableDrag: false,
-      overlayTitle: "School Call",
-      overlayContent: "Incoming call",
-      flag: OverlayFlag.focusPointer,
-      visibility: NotificationVisibility.visibilityPublic,
-      positionGravity: PositionGravity.auto,
-      height: WindowSize.matchParent,
-      width: WindowSize.matchParent,
+    const NotificationDetails notificationDetails = NotificationDetails(
+      android: androidDetails,
     );
 
-    // ✅ Send data AFTER overlay opens
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    await FlutterOverlayWindow.shareData({'school_name': widget.schoolName});
-
-    print("✅ Overlay Shown with school name: ${widget.schoolName}");
+    await flutterLocalNotificationsPlugin.show(
+      0,
+      'Incoming Call',
+      '${widget.schoolName} is calling you',
+      notificationDetails,
+      payload: widget.schoolName, // ✅ PASS DATA HERE
+    );
   }
 
   Future<void> _logout() async {

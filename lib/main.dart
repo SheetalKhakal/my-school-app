@@ -1,20 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:my_school_app/modules/home.dart';
 import 'package:my_school_app/modules/login.dart';
+import 'package:my_school_app/modules/call_screen.dart'; // ✅ ADD THIS
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // ✅ ADD THIS
 
-/// Entry point — also handles the overlay window entry point
+/// ✅ Global navigator key (VERY IMPORTANT)
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+/// Notification plugin
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+/// Entry point for overlay (optional)
 @pragma("vm:entry-point")
 void overlayMain() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const OverlayApp());
 }
 
+Future<void> initNotifications() async {
+  const AndroidInitializationSettings androidSettings =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+
+  const InitializationSettings settings = InitializationSettings(
+    android: androidSettings,
+  );
+
+  await flutterLocalNotificationsPlugin.initialize(
+    settings,
+    onDidReceiveNotificationResponse: (response) {
+      final schoolName = response.payload ?? 'My School';
+
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => CallScreen(schoolName: schoolName)),
+      );
+    },
+  );
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Check if a phone number is already saved
+  await initNotifications(); // ✅ INIT NOTIFICATIONS FIRST
+
   final prefs = await SharedPreferences.getInstance();
   final savedNumber = prefs.getString('monitored_phone') ?? '';
   final schoolName = prefs.getString('school_name') ?? '';
@@ -44,6 +74,7 @@ class SchoolCallApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'School Call Alert',
+      navigatorKey: navigatorKey, // ✅ REQUIRED
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -59,7 +90,7 @@ class SchoolCallApp extends StatelessWidget {
   }
 }
 
-/// Separate app shown inside the overlay window when a call arrives
+/// Overlay App (optional)
 class OverlayApp extends StatelessWidget {
   const OverlayApp({super.key});
 
@@ -72,6 +103,7 @@ class OverlayApp extends StatelessWidget {
   }
 }
 
+/// Overlay UI (optional, may not work on latest Android)
 class OverlayCallScreen extends StatefulWidget {
   const OverlayCallScreen({super.key});
 
@@ -89,15 +121,16 @@ class _OverlayCallScreenState extends State<OverlayCallScreen>
   void initState() {
     super.initState();
     _loadSchoolName();
+
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 1),
     )..repeat(reverse: true);
+
     _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // Listen for data sent from the main app
     FlutterOverlayWindow.overlayListener.listen((data) {
       if (data != null && data is Map) {
         setState(() {
@@ -123,153 +156,12 @@ class _OverlayCallScreenState extends State<OverlayCallScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0D1B6E),
-              Color(0xFF1A237E),
-              Color(0xFF283593),
-              Color(0xFF1565C0),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Incoming call banner
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                color: const Color(0xFFE53935),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.call_rounded, color: Colors.white, size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      'INCOMING CALL',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const Spacer(),
-
-              // Animated school logo
-              ScaleTransition(
-                scale: _pulseAnimation,
-                child: Container(
-                  width: 150,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.white.withOpacity(0.4),
-                        blurRadius: 40,
-                        spreadRadius: 10,
-                      ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.school_rounded,
-                      size: 80,
-                      color: Color(0xFF1A237E),
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 32),
-
-              // School name
-              Text(
-                schoolName,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
-                  shadows: [
-                    Shadow(
-                      color: Colors.black38,
-                      blurRadius: 8,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              const Text(
-                'is calling you',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w400,
-                  letterSpacing: 0.5,
-                ),
-              ),
-
-              const Spacer(),
-
-              // Dismiss button
-              GestureDetector(
-                onTap: () => FlutterOverlayWindow.closeOverlay(),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(50),
-                    border: Border.all(color: Colors.white38, width: 1.5),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.close_rounded, color: Colors.white, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'Dismiss',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 40),
-            ],
-          ),
+      body: Center(
+        child: Text(
+          schoolName,
+          style: const TextStyle(fontSize: 24, color: Colors.black),
         ),
       ),
     );
   }
-}
-
-@override
-Widget build(BuildContext context) {
-  return MaterialApp(debugShowCheckedModeBanner: false, home: LoginScreen());
 }
