@@ -110,6 +110,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           importance: Importance.max,
           priority: Priority.high,
           fullScreenIntent: true,
+          category: AndroidNotificationCategory.call,
         );
 
     const NotificationDetails notificationDetails = NotificationDetails(
