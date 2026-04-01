@@ -27,7 +27,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String _statusText = 'Requesting permissions…';
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseAnim;
-
+  String _lastIncomingNumber = '';
   @override
   void initState() {
     super.initState();
@@ -69,13 +69,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   void _startListening() {
     PhoneState.stream.listen((PhoneState event) async {
+      final incoming = event.number ?? '';
+
+      // Save number when ringing
       if (event.status == PhoneStateStatus.CALL_INCOMING ||
           event.status == PhoneStateStatus.CALL_STARTED) {
-        final incoming = event.number ?? '';
-        final normalized = _normalizeNumber(incoming);
-        final saved = _normalizeNumber(widget.phoneNumber);
+        _lastIncomingNumber = incoming;
+      }
 
+      final normalized = _normalizeNumber(_lastIncomingNumber);
+      final saved = _normalizeNumber(widget.phoneNumber);
+
+      print("Saved normalized: $saved");
+      print("Last incoming normalized: $normalized");
+
+      // ✅ Trigger AFTER call ends
+      if (event.status == PhoneStateStatus.CALL_ENDED) {
         if (normalized.endsWith(saved) || saved.endsWith(normalized)) {
+          print("✅ CALL ENDED MATCH → SHOW OVERLAY");
           await _showSchoolOverlay();
         }
       }
@@ -83,26 +94,49 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   String _normalizeNumber(String number) {
-    return number.replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
+    number = number.replaceAll(RegExp(r'\D'), '');
+
+    // Always take last 10 digits
+    if (number.length > 10) {
+      number = number.substring(number.length - 10);
+    }
+
+    return number;
   }
 
   Future<void> _showSchoolOverlay() async {
-    final isActive = await FlutterOverlayWindow.isActive();
-    if (!isActive) {
-      await FlutterOverlayWindow.showOverlay(
-        enableDrag: false,
-        overlayTitle: widget.schoolName,
-        overlayContent: 'Incoming call from ${widget.schoolName}',
-        flag: OverlayFlag.defaultFlag,
-        visibility: NotificationVisibility.visibilityPublic,
-        positionGravity: PositionGravity.auto,
-        height: WindowSize.fullCover,
-        width: WindowSize.fullCover,
-      );
+    final isGranted = await FlutterOverlayWindow.isPermissionGranted();
 
-      // Send school name data to overlay
-      await FlutterOverlayWindow.shareData({'school_name': widget.schoolName});
+    if (!isGranted) {
+      await FlutterOverlayWindow.requestPermission();
+      return;
     }
+
+    final isActive = await FlutterOverlayWindow.isActive();
+
+    // ✅ Always close previous overlay (important fix)
+    if (isActive) {
+      await FlutterOverlayWindow.closeOverlay();
+      await Future.delayed(const Duration(milliseconds: 200));
+    }
+
+    await FlutterOverlayWindow.showOverlay(
+      enableDrag: false,
+      overlayTitle: "School Call",
+      overlayContent: "Incoming call",
+      flag: OverlayFlag.focusPointer,
+      visibility: NotificationVisibility.visibilityPublic,
+      positionGravity: PositionGravity.auto,
+      height: WindowSize.matchParent,
+      width: WindowSize.matchParent,
+    );
+
+    // ✅ Send data AFTER overlay opens
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    await FlutterOverlayWindow.shareData({'school_name': widget.schoolName});
+
+    print("✅ Overlay Shown with school name: ${widget.schoolName}");
   }
 
   Future<void> _logout() async {

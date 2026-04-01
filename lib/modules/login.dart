@@ -19,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen>
   final _formKey = GlobalKey<FormState>();
   bool _isSaving = false;
   bool _phoneValid = false;
+  String fullNumber = '';
 
   late AnimationController _fadeController;
   late AnimationController _slideController;
@@ -67,7 +68,10 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() => _isSaving = true);
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('monitored_phone', _phoneController.text.trim());
+    await prefs.setString(
+      'monitored_phone',
+      fullNumber.isNotEmpty ? fullNumber : _phoneController.text.trim(),
+    );
     await prefs.setString('school_name', _schoolController.text.trim());
 
     if (!mounted) return;
@@ -77,7 +81,7 @@ class _LoginScreenState extends State<LoginScreen>
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 500),
         pageBuilder: (_, __, ___) => HomeScreen(
-          phoneNumber: _phoneController.text.trim(),
+          phoneNumber: fullNumber,
           schoolName: _schoolController.text.trim(),
         ),
         transitionsBuilder: (_, animation, __, child) {
@@ -287,6 +291,7 @@ class _LoginScreenState extends State<LoginScreen>
                           ),
                           initialCountryCode: 'IN', // default country
                           onChanged: (phone) {
+                            fullNumber = phone.completeNumber;
                             print(phone.completeNumber); // includes +91
                           },
                           validator: (v) {
