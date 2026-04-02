@@ -301,64 +301,9 @@ class _LoginScreenState extends State<LoginScreen>
                           },
                         ),
 
-                        // _buildTextField(
-                        //   controller: _phoneController,
-                        //   hint: 'e.g.9876543210',
-                        //   icon: Icons.phone_rounded,
-                        //   keyboardType: TextInputType.phone,
-                        //   inputFormatters: [
-                        //     FilteringTextInputFormatter.digitsOnly,
-                        //     LengthLimitingTextInputFormatter(15),
-                        //   ],
-                        //   validator: (v) {
-                        //     if (v == null || v.trim().isEmpty) {
-                        //       return 'Please enter the phone number';
-                        //     }
-                        //     if (v.trim().length < 10) {
-                        //       return 'Enter at least 10 digits';
-                        //     }
-                        //     return null;
-                        //   },
-                        // ),
-                        const SizedBox(height: 12),
-
-                        // Info hint
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1A237E).withOpacity(0.4),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: const Color(0xFF3949AB).withOpacity(0.5),
-                            ),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(
-                                Icons.info_outline_rounded,
-                                color: Color(0xFF90CAF9),
-                                size: 18,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'When this number calls you, a full-screen banner with your school logo will appear automatically.',
-                                  style: GoogleFonts.nunito(
-                                    color: const Color(0xFF90CAF9),
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    height: 1.5,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
                         const SizedBox(height: 36),
 
-                        // Save button
+                        // Login button
                         SizedBox(
                           width: double.infinity,
                           height: 58,
@@ -386,7 +331,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
-                                        'Save & Continue',
+                                        'Login',
                                         style: GoogleFonts.nunito(
                                           fontSize: 17,
                                           fontWeight: FontWeight.w800,
