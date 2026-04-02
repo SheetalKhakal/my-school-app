@@ -49,10 +49,10 @@ When a matching number is detected, the app shows:
 
 ```bash
 # Clone repository
-git clone https://github.com/your-username/school-caller-app.git
+git clone https://github.com/SheetalKhakal/my-school-app.git
 
 # Navigate to project
-cd school-caller-app
+cd my-school-app
 
 # Install dependencies
 flutter pub get

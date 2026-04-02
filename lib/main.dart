@@ -73,7 +73,7 @@ class SchoolCallApp extends StatelessWidget {
     return MaterialApp(
       title: 'School Call Alert',
       navigatorKey: navigatorKey,
-      debugShowCheckedModeBanner: false,
+      debugShowCheckedModeBanner: true,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF1A237E),
