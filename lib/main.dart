@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:my_school_app/modules/home.dart';
-import 'package:my_school_app/modules/login.dart';
-import 'package:my_school_app/modules/call_screen.dart'; // ✅ ADD THIS
+import 'package:my_school_app/views/home.dart';
+import 'package:my_school_app/views/login.dart';
+import 'package:my_school_app/views/call_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // ✅ ADD THIS
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-/// ✅ Global navigator key (VERY IMPORTANT)
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-/// Notification plugin
+//Notification plugin
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
-/// Entry point for overlay (optional)
+// Entry point for overlay
 @pragma("vm:entry-point")
 void overlayMain() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,8 +42,7 @@ Future<void> initNotifications() async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await initNotifications(); // ✅ INIT NOTIFICATIONS FIRST
-
+  await initNotifications();
   final prefs = await SharedPreferences.getInstance();
   final savedNumber = prefs.getString('monitored_phone') ?? '';
   final schoolName = prefs.getString('school_name') ?? '';
@@ -74,7 +72,7 @@ class SchoolCallApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'School Call Alert',
-      navigatorKey: navigatorKey, // ✅ REQUIRED
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -90,7 +88,7 @@ class SchoolCallApp extends StatelessWidget {
   }
 }
 
-/// Overlay App (optional)
+/// Overlay App
 class OverlayApp extends StatelessWidget {
   const OverlayApp({super.key});
 
@@ -103,7 +101,6 @@ class OverlayApp extends StatelessWidget {
   }
 }
 
-/// Overlay UI (optional, may not work on latest Android)
 class OverlayCallScreen extends StatefulWidget {
   const OverlayCallScreen({super.key});
 

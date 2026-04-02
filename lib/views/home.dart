@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:my_school_app/main.dart';
-import 'package:my_school_app/modules/login.dart';
+import 'package:my_school_app/views/login.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:phone_state/phone_state.dart';
-import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'call_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -29,6 +28,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseAnim;
   String _lastIncomingNumber = '';
+  bool _isListening = false;
+  bool _isNotificationShown = false;
+
   @override
   void initState() {
     super.initState();
@@ -45,47 +47,48 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _initPermissions() async {
-    // 📞 Phone permission
     final phoneStatus = await Permission.phone.request();
-
-    // 🔔 Notification permission (IMPORTANT for Android 13+)
     final notificationStatus = await Permission.notification.request();
 
     setState(() {
       _monitoringActive = phoneStatus.isGranted && notificationStatus.isGranted;
-
       _statusText = _monitoringActive
           ? 'Monitoring active'
           : 'Grant phone & notification permissions';
     });
 
-    if (_monitoringActive) {
+    if (_monitoringActive && !_isListening) {
+      _isListening = true;
       _startListening();
     }
   }
 
   void _startListening() {
     PhoneState.stream.listen((PhoneState event) async {
+      if (event.status == PhoneStateStatus.NOTHING) return;
+
       final incoming = event.number ?? '';
 
-      // Save number when ringing
-      if (event.status == PhoneStateStatus.CALL_INCOMING ||
-          event.status == PhoneStateStatus.CALL_STARTED) {
-        _lastIncomingNumber = incoming;
-      }
+      if (event.status == PhoneStateStatus.CALL_INCOMING) {
+        if (incoming.isNotEmpty) {
+          _lastIncomingNumber = incoming;
+        }
 
-      final normalized = _normalizeNumber(_lastIncomingNumber);
-      final saved = _normalizeNumber(widget.phoneNumber);
+        final normalized = _normalizeNumber(_lastIncomingNumber);
+        final saved = _normalizeNumber(widget.phoneNumber);
 
-      print("Saved normalized: $saved");
-      print("Last incoming normalized: $normalized");
+        //Show notification
+        if (!_isNotificationShown &&
+            normalized.isNotEmpty &&
+            (normalized.endsWith(saved) || saved.endsWith(normalized))) {
+          _isNotificationShown = true;
 
-      // ✅ Trigger AFTER call ends
-      if (event.status == PhoneStateStatus.CALL_ENDED) {
-        if (normalized.endsWith(saved) || saved.endsWith(normalized)) {
-          print("✅ CALL ENDED MATCH → SHOW OVERLAY");
           await _showCallNotification();
         }
+      }
+      if (event.status == PhoneStateStatus.CALL_ENDED) {
+        _lastIncomingNumber = '';
+        _isNotificationShown = false;
       }
     });
   }
@@ -122,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       'Incoming Call',
       '${widget.schoolName} is calling you',
       notificationDetails,
-      payload: widget.schoolName, // ✅ PASS DATA HERE
+      payload: widget.schoolName,
     );
   }
 
@@ -204,7 +207,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       backgroundColor: const Color(0xFF0A0E2A),
       body: Stack(
         children: [
-          // Background blobs
           Positioned(
             top: -60,
             right: -80,
@@ -248,7 +250,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 children: [
                   const SizedBox(height: 24),
 
-                  // Top bar
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -274,7 +275,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                   const SizedBox(height: 40),
 
-                  // Status card
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(24),
@@ -295,7 +295,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                     child: Column(
                       children: [
-                        // Pulsing indicator
                         ScaleTransition(
                           scale: _pulseAnim,
                           child: Container(

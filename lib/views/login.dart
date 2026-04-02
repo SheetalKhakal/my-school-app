@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
-import 'package:my_school_app/modules/home.dart';
+import 'package:my_school_app/views/home.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -97,7 +97,6 @@ class _LoginScreenState extends State<LoginScreen>
       backgroundColor: const Color(0xFF0A0E2A),
       body: Stack(
         children: [
-          // Background decoration blobs
           Positioned(
             top: -80,
             right: -60,
@@ -133,7 +132,6 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
 
-          // Main content
           SafeArea(
             child: FadeTransition(
               opacity: _fadeAnim,
@@ -146,9 +144,8 @@ class _LoginScreenState extends State<LoginScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 56),
+                        SizedBox(height: 70),
 
-                        // Logo area
                         Center(
                           child: Container(
                             width: 96,
@@ -181,10 +178,9 @@ class _LoginScreenState extends State<LoginScreen>
 
                         const SizedBox(height: 32),
 
-                        // Heading
                         Center(
                           child: Text(
-                            'School Call\nIdentifier',
+                            'School Caller',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.nunito(
                               fontSize: 34,
@@ -211,7 +207,6 @@ class _LoginScreenState extends State<LoginScreen>
 
                         const SizedBox(height: 48),
 
-                        // School name field
                         _buildLabel('School Name'),
                         const SizedBox(height: 8),
                         _buildTextField(
@@ -228,7 +223,6 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                         const SizedBox(height: 24),
 
-                        // Phone number field
                         _buildLabel("School's Phone Number"),
                         const SizedBox(height: 8),
                         IntlPhoneField(
@@ -289,10 +283,10 @@ class _LoginScreenState extends State<LoginScreen>
                               vertical: 18,
                             ),
                           ),
-                          initialCountryCode: 'IN', // default country
+                          initialCountryCode: 'IN',
                           onChanged: (phone) {
                             fullNumber = phone.completeNumber;
-                            print(phone.completeNumber); // includes +91
+                            print(phone.completeNumber);
                           },
                           validator: (v) {
                             if (v == null || v.number.isEmpty)
@@ -301,9 +295,8 @@ class _LoginScreenState extends State<LoginScreen>
                           },
                         ),
 
-                        const SizedBox(height: 36),
+                        const SizedBox(height: 56),
 
-                        // Login button
                         SizedBox(
                           width: double.infinity,
                           height: 58,
